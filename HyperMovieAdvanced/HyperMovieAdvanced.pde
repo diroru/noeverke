@@ -12,7 +12,7 @@ PGraphics lookupCubeFront, lookupCubeBack;
 PShape lookupCube;
 int BUFFER_SIZE = 2048;
 
-int SLICE_COUNT = 300;
+int SLICE_COUNT = 100;
 float SCALE_FACTOR = 1;
 int ROW_COUNT, COL_COUNT;
 
@@ -25,23 +25,24 @@ float SLICE_WIDTH = 160;
 float SLICE_HEIGHT = 90;
 
 float angleX = radians(-15);
-;
 float angleY = radians(210);
 float zoom = 100;
 
 boolean displayBuffer = false;
-PShape quad;
-PShader filter;
+PShape bufferQuad,sketchQuad;
+PShader filter, rayTracer;
 
 void setup() {
   size(1600, 900, P3D);
-  initGraphics();
+  initGraphics(BUFFER_SIZE, BUFFER_SIZE);
 
   mov = new Movie(this, "mov/bbb.mp4");
   mov.loop();
 
   initGUI();
-  initShape(BUFFER_SIZE, BUFFER_SIZE);
+  //bufferQuad = initQuad(BUFFER_SIZE, BUFFER_SIZE);
+  bufferQuad = initQuad(buffer.width, buffer.height);
+  sketchQuad = initQuad(width, height);
   initShaders();
   initLookupCube(SLICE_WIDTH, SLICE_HEIGHT, deltaZ * SLICE_COUNT);
   hint(DISABLE_DEPTH_TEST);
@@ -49,49 +50,49 @@ void setup() {
 
 void draw() {
 
-  /*
   //write new slice into "buffer"
-   if (scheduleBufferUpdate) {
-   int currentCol = currentIndex % COL_COUNT;
-   int currentRow = floor(currentIndex / COL_COUNT);
-   float x = currentCol * mov.width * SCALE_FACTOR;
-   float y = currentRow * mov.height * SCALE_FACTOR;
-   float w =  mov.width * SCALE_FACTOR;
-   float h =  mov.height * SCALE_FACTOR;
-   buffer.beginDraw();
-   buffer.image(mov, x, y, w, h);
-   buffer.endDraw();
-   currentIndex = (currentIndex+1) % SLICE_COUNT;
-   scheduleBufferUpdate = false;
-   filteredBuffer.beginDraw();
-   filteredBuffer.background(0, 0);
-   filteredBuffer.shader(filter);
-   filteredBuffer.shape(quad);
-   filteredBuffer.endDraw();
-   }
-   
-   updateShaders();
-   
-   if (displayBuffer) {
-   background(0, 255, 0);
-   float scale = min(float(width) / buffer.width, float(height) / buffer.height);
-   image(filteredBuffer, 0, 0, filteredBuffer.width*scale, filteredBuffer.height*scale);
-   } else {
-   background(31);
-   translate(width*0.5, height*0.5, zoom);
-   rotateX(angleX);
-   rotateY(angleY);
-   displaySlices(deltaZ);
-   }
-   
-   if (drawGUI) {
-   drawGUI();
-   }
-   */
+  if (scheduleBufferUpdate) {
+    int currentCol = currentIndex % COL_COUNT;
+    int currentRow = floor(currentIndex / COL_COUNT);
+    float x = currentCol * mov.width * SCALE_FACTOR;
+    float y = currentRow * mov.height * SCALE_FACTOR;
+    float w =  mov.width * SCALE_FACTOR;
+    float h =  mov.height * SCALE_FACTOR;
+    buffer.beginDraw();
+    buffer.image(mov, x, y, w, h);
+    buffer.endDraw();
+    currentIndex = (currentIndex+1) % SLICE_COUNT;
+    rayTracer.set("currentIndex", currentIndex + 0f);
+    scheduleBufferUpdate = false;
+    filteredBuffer.beginDraw();
+    filteredBuffer.background(0, 0);
+    filteredBuffer.shader(filter);
+    filteredBuffer.shape(bufferQuad);
+    filteredBuffer.endDraw();
+  }
 
+  updateShaders();
   drawLookupCube(angleX, angleY, zoom);
+
+  if (displayBuffer) {
+    background(0, 255, 0);
+    float scale = min(float(width) / buffer.width, float(height) / buffer.height);
+    image(filteredBuffer, 0, 0, filteredBuffer.width*scale, filteredBuffer.height*scale);
+  } else {
+    background(0);
+    shader(rayTracer);
+    shape(sketchQuad);
+    resetShader();
+  }
+
+  if (drawGUI) {
+    drawGUI();
+  }
+
+  /*
   image(lookupCubeFront, 0, 0, width*0.5, height*0.5);
-  image(lookupCubeBack, width*0.5, 0, width*0.5, height*0.5);
+   image(lookupCubeBack, width*0.5, 0, width*0.5, height*0.5);
+   */
 }
 
 void mouseDragged() {
@@ -117,12 +118,12 @@ void keyPressed() {
   }
 }
 
-void initGraphics() {
-  buffer = createGraphics(BUFFER_SIZE, BUFFER_SIZE, P2D);
+void initGraphics(int w, int h) {
+  buffer = createGraphics(w, h, P2D);
   buffer.beginDraw();
   buffer.background(0);
   buffer.endDraw();
-  filteredBuffer = createGraphics(BUFFER_SIZE, BUFFER_SIZE, P3D);
+  filteredBuffer = createGraphics(w, h, P3D);
   filteredBuffer.beginDraw();
   filteredBuffer.background(0);
   filteredBuffer.endDraw();
@@ -139,6 +140,20 @@ void initGraphics() {
 void initShaders() {
   filter = loadShader("glsl/filter.frag", "glsl/filter.vert");
   filter.set("srcTex", buffer);
+  rayTracer = loadShader("glsl/rayTracer.frag", "glsl/rayTracer.vert");
+  rayTracer.set("lookupTexBack", lookupCubeBack);
+  rayTracer.set("lookupTexFront", lookupCubeFront);
+  rayTracer.set("sliceTex", filteredBuffer);
+  rayTracer.set("sliceCount", SLICE_COUNT + 0f);
+  rayTracer.set("sliceColCount", COL_COUNT + 0f);
+  //rayTracer.set("sliceRowCount",  ROW_COUNT + 0f);
+  float sliceNormWidth = mov.width * SCALE_FACTOR / float(buffer.width);
+  float sliceNormHeight = mov.height * SCALE_FACTOR / float(buffer.height);
+  rayTracer.set("sliceNormWidth", sliceNormWidth);
+  rayTracer.set("sliceNormHeight", sliceNormHeight);
+  println(sliceNormWidth, sliceNormHeight);
+  println(sliceNormWidth * COL_COUNT * SLICE_WIDTH, sliceNormHeight * ROW_COUNT * SLICE_HEIGHT);
+  println(buffer.width, buffer.height);
 }
 
 void updateShaders() {
@@ -163,7 +178,7 @@ void initLookupCube(float w, float h, float d) {
   colouredVertex(lookupCube, w, h, d, 1, 0, 1);
   colouredVertex(lookupCube, w, h, d, 1, 1, 1);
   colouredVertex(lookupCube, w, h, d, 0, 1, 1);
-  
+
   colouredVertex(lookupCube, w, h, d, 0, 0, 0);
   colouredVertex(lookupCube, w, h, d, 1, 0, 0);
   colouredVertex(lookupCube, w, h, d, 1, 0, 1);
@@ -173,7 +188,7 @@ void initLookupCube(float w, float h, float d) {
   colouredVertex(lookupCube, w, h, d, 1, 1, 1);
   colouredVertex(lookupCube, w, h, d, 1, 1, 0);
   colouredVertex(lookupCube, w, h, d, 0, 1, 0);
-  
+
   colouredVertex(lookupCube, w, h, d, 0, 0, 1);
   colouredVertex(lookupCube, w, h, d, 0, 1, 1);
   colouredVertex(lookupCube, w, h, d, 0, 1, 0);
@@ -183,7 +198,7 @@ void initLookupCube(float w, float h, float d) {
   colouredVertex(lookupCube, w, h, d, 1, 1, 0);
   colouredVertex(lookupCube, w, h, d, 1, 1, 1);
   colouredVertex(lookupCube, w, h, d, 1, 0, 1);
-  
+
   lookupCube.endShape(CLOSE);
 }
 
@@ -197,7 +212,7 @@ void drawLookupCube(float rx, float ry, float z) {
   PGL pgl = lookupCubeFront.beginPGL();
   pgl.enable(PGL.CULL_FACE);
   pgl.cullFace(PGL.BACK);
-  lookupCubeFront.background(0);
+  lookupCubeFront.background(0,0);
   lookupCubeFront.translate(width*0.5, height*0.5, z);
   lookupCubeFront.rotateX(rx);
   lookupCubeFront.rotateY(ry);
@@ -207,7 +222,7 @@ void drawLookupCube(float rx, float ry, float z) {
   PGL pgl2 = lookupCubeBack.beginPGL();
   pgl2.enable(PGL.CULL_FACE);
   pgl2.cullFace(PGL.FRONT);
-  lookupCubeBack.background(0);
+  lookupCubeBack.background(0,0);
   lookupCubeBack.translate(width*0.5, height*0.5, z);
   lookupCubeBack.rotateX(rx);
   lookupCubeBack.rotateY(ry);
@@ -217,8 +232,8 @@ void drawLookupCube(float rx, float ry, float z) {
   endPGL(); // restores the GL defaults for Processing
 }
 
-void initShape(int theW, int theH) {
-  quad = createShape();
+PShape initQuad(int theW, int theH) {
+  PShape quad = createShape();
   quad.beginShape();
   quad.fill(255, 255, 0);
   quad.textureMode(NORMAL);
@@ -228,12 +243,14 @@ void initShape(int theW, int theH) {
   quad.vertex(theW, theH, 0, 1, 0);
   quad.vertex(0, theH, 0, 0, 0);
   quad.endShape();
+  return quad;
 }
 
 void movieEvent(Movie m) {
   m.read();
   if (!movieInit) {
     initScaleFactor();
+    initShaders();
     movieInit = true;
   }
   scheduleBufferUpdate = true;
