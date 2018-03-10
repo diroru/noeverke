@@ -12,7 +12,7 @@ PGraphics lookupCubeFront, lookupCubeBack;
 PShape lookupCube;
 int BUFFER_SIZE = 2048;
 
-int SLICE_COUNT = 100;
+int SLICE_COUNT = 300;
 float SCALE_FACTOR = 1;
 int ROW_COUNT, COL_COUNT;
 
@@ -24,19 +24,22 @@ float deltaZ = 2; //distance between two slices
 float SLICE_WIDTH = 160;
 float SLICE_HEIGHT = 90;
 
-float angleX = radians(-15);
-float angleY = radians(210);
+float angleX = radians(190);
+float angleY = radians(160);
 float zoom = 100;
 
 boolean displayBuffer = false;
-PShape bufferQuad,sketchQuad;
-PShader filter, rayTracer;
+PShape bufferQuad, sketchQuad;
+PShader filter, rayTracer, rayTracerNorm;
 
 void setup() {
   size(1600, 900, P3D);
-  initGraphics(BUFFER_SIZE, BUFFER_SIZE);
+  //initGraphics(BUFFER_SIZE, BUFFER_SIZE);
+  initGraphics(width*3, height*3);
 
   mov = new Movie(this, "mov/bbb.mp4");
+  //mov = new Movie(this, "mov/hprmv_test3.mp4");
+  //mov = new Movie(this, "mov/hprmv_test2_full.mp4");
   mov.loop();
 
   initGUI();
@@ -63,6 +66,9 @@ void draw() {
     buffer.endDraw();
     currentIndex = (currentIndex+1) % SLICE_COUNT;
     rayTracer.set("currentIndex", currentIndex + 0f);
+    rayTracerNorm.set("currentIndex", currentIndex + 0f);
+    rayTracerNorm.set("steps", map(mouseX,0,width, 8, 512));
+    rayTracerNorm.set("pixelFactor", map(mouseY,0,height, 0.1, 10));
     scheduleBufferUpdate = false;
     filteredBuffer.beginDraw();
     filteredBuffer.background(0, 0);
@@ -80,7 +86,8 @@ void draw() {
     image(filteredBuffer, 0, 0, filteredBuffer.width*scale, filteredBuffer.height*scale);
   } else {
     background(0);
-    shader(rayTracer);
+   shader(rayTracer);
+    //shader(rayTracerNorm);
     shape(sketchQuad);
     resetShader();
   }
@@ -99,6 +106,7 @@ void mouseDragged() {
   if (!drawGUI) {
     angleX += (pmouseY-mouseY) * 0.01;
     angleY += (mouseX-pmouseX) * 0.01;
+    println("angle x", degrees(angleX), "angle y", degrees(angleY));
   }
 }
 
@@ -151,9 +159,20 @@ void initShaders() {
   float sliceNormHeight = mov.height * SCALE_FACTOR / float(buffer.height);
   rayTracer.set("sliceNormWidth", sliceNormWidth);
   rayTracer.set("sliceNormHeight", sliceNormHeight);
+
+  rayTracerNorm = loadShader("glsl/rayTracerNorm.frag", "glsl/rayTracerNorm.vert");
+  rayTracerNorm.set("lookupTexBack", lookupCubeBack);
+  rayTracerNorm.set("lookupTexFront", lookupCubeFront);
+  rayTracerNorm.set("sliceTex", filteredBuffer);
+  rayTracerNorm.set("sliceCount", SLICE_COUNT + 0f);
+  rayTracerNorm.set("sliceColCount", COL_COUNT + 0f);
+  rayTracerNorm.set("sliceNormWidth", sliceNormWidth);
+  rayTracerNorm.set("sliceNormHeight", sliceNormHeight);
+  rayTracerNorm.set("canvasSize", width + 0f, height + 0f);
   println(sliceNormWidth, sliceNormHeight);
   println(sliceNormWidth * COL_COUNT * SLICE_WIDTH, sliceNormHeight * ROW_COUNT * SLICE_HEIGHT);
   println(buffer.width, buffer.height);
+  println("slice count", SLICE_COUNT);
 }
 
 void updateShaders() {
@@ -212,7 +231,7 @@ void drawLookupCube(float rx, float ry, float z) {
   PGL pgl = lookupCubeFront.beginPGL();
   pgl.enable(PGL.CULL_FACE);
   pgl.cullFace(PGL.BACK);
-  lookupCubeFront.background(0,0);
+  lookupCubeFront.background(0, 0);
   lookupCubeFront.translate(width*0.5, height*0.5, z);
   lookupCubeFront.rotateX(rx);
   lookupCubeFront.rotateY(ry);
@@ -222,7 +241,7 @@ void drawLookupCube(float rx, float ry, float z) {
   PGL pgl2 = lookupCubeBack.beginPGL();
   pgl2.enable(PGL.CULL_FACE);
   pgl2.cullFace(PGL.FRONT);
-  lookupCubeBack.background(0,0);
+  lookupCubeBack.background(0, 0);
   lookupCubeBack.translate(width*0.5, height*0.5, z);
   lookupCubeBack.rotateX(rx);
   lookupCubeBack.rotateY(ry);
