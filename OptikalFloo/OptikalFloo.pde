@@ -5,6 +5,7 @@ OpenCV opencv;
 Movie video;
 PImage flowImage;
 float maxFlow = Float.MIN_VALUE;
+float maxFlowRadius = Float.MIN_VALUE;
 
 void setup() {
   size(1136, 320);
@@ -50,6 +51,7 @@ void draw() {
       maxFlow = max(v.x, maxFlow);
       maxFlow = max(v.y, maxFlow);
       maxFlow = max(v.z, maxFlow);
+      maxFlowRadius = max(sqrt(v.x * v.x + v.y * v.y + v.z * v.z), maxFlowRadius);
       float r = map(v.x, -maxFlow, maxFlow, 0, 255);
       float g = map(v.y, -maxFlow, maxFlow, 0, 255);
       float b = map(v.z, -maxFlow, maxFlow, 0, 255);
@@ -59,7 +61,7 @@ void draw() {
   }
   flowImage.updatePixels();
   image(flowImage, 0, 0);
-  println("max: ", maxFlow);
+  println("max: ", maxFlow, "max r: ", maxFlowRadius);
   /*
   PVector aveFlow = opencv.getAverageFlow();
    int flowScale = 50;
