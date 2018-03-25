@@ -41,7 +41,7 @@ void setup() {
   filteredBuffer.background(0);
   filteredBuffer.endDraw();
 
-  mov = new Movie(this, "mov/bbb.mp4");
+  mov = new Movie(this, "mov/SB.mp4");
   mov.loop();
 
   initGUI();
