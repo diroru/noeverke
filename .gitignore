@@ -7,3 +7,4 @@ application.windows64
 application.macosx
 build/
 HyperMovie/data/mov/SB.mp4
+*.mov
